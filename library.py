@@ -1,43 +1,59 @@
+from db_config import get_connection
+
 class Library:
-    def __init__(self):
-        self.books_file = "data/books.txt"
-        self.issued_file = "data/issued_books.txt"
 
     def display_books(self):
-        print("\nAvailable Books:")
-        try:
-            with open(self.books_file, "r") as f:
-                books = f.readlines()
-                if not books:
-                    print("No books available")
-                for book in books:
-                    print("-", book.strip())
-        except FileNotFoundError:
-            print("Books file not found")
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM books")
+        books = cursor.fetchall()
+
+        if not books:
+            print("No books available")
+        else:
+            print("\nAvailable Books:")
+            for book in books:
+                print("-", book[0])
+
+        conn.close()
 
     def add_book(self, book):
-        with open(self.books_file, "a") as f:
-            f.write(book + "\n")
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO books (name) VALUES (%s)", (book,))
+        conn.commit()
+        conn.close()
         print("Book added successfully")
 
     def issue_book(self, book, user):
-        with open(self.books_file, "r") as f:
-            books = f.readlines()
+        conn = get_connection()
+        cursor = conn.cursor()
 
-        if book + "\n" not in books:
+        cursor.execute("SELECT * FROM books WHERE name=%s", (book,))
+        result = cursor.fetchone()
+
+        if not result:
             print("Book not available")
+            conn.close()
             return
 
-        books.remove(book + "\n")
-        with open(self.books_file, "w") as f:
-            f.writelines(books)
+        cursor.execute("DELETE FROM books WHERE name=%s", (book,))
+        cursor.execute(
+            "INSERT INTO issued_books (book_name, issued_to) VALUES (%s, %s)",
+            (book, user)
+        )
 
-        with open(self.issued_file, "a") as f:
-            f.write(book + " issued to " + user + "\n")
-
+        conn.commit()
+        conn.close()
         print("Book issued successfully")
 
     def return_book(self, book):
-        with open(self.books_file, "a") as f:
-            f.write(book + "\n")
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("INSERT INTO books (name) VALUES (%s)", (book,))
+        cursor.execute("DELETE FROM issued_books WHERE book_name=%s", (book,))
+
+        conn.commit()
+        conn.close()
         print("Book returned successfully")
